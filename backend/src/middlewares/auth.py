@@ -33,7 +33,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content=error_envelope(
-                    ErrorCode.UNAUTHORIZED.value,
+                    ErrorCode.UNAUTHORIZED,
                     "未登录或登录已过期",
                     getattr(request.state, "request_id", None),
                 ),

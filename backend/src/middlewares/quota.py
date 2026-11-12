@@ -94,7 +94,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=429,
                     content=error_envelope(
-                        ErrorCode.RATE_LIMITED.value,
+                        ErrorCode.RATE_LIMITED,
                         "请求过于频繁",
                         getattr(request.state, "request_id", None),
                         {"retry_after": settings.RATE_WINDOW_SECONDS},

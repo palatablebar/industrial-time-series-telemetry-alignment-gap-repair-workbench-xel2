@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from src.constants.error_codes import AppError, ErrorCode
 from src.models import AlignmentRun, GapEvent, User
-from src.utils.timeutil import from_epoch, iso
+from src.services import ownership_service
+from src.utils.timeutil import from_epoch, iso, to_epoch
 
 EXPORT_HEADER = [
     "signal_code",
@@ -74,13 +75,21 @@ def to_detail(db: Session, run: AlignmentRun) -> dict:
         db.scalars(select(GapEvent).where(GapEvent.run_id == run.id).order_by(GapEvent.start_ts, GapEvent.id))
     )
     gap_payload = []
+    ownership_cache: dict[int, list] = {}
     for gap in gaps:
         signal = gap.signal
+        # attribute the gap to the device that owned the tag at the gap's
+        # collection time, so old runs keep their original device attribution
+        device_code = signal.device_code if signal else ""
+        if signal is not None:
+            device_code, _device_name = ownership_service.resolve_device(
+                db, signal, to_epoch(gap.start_ts), ownership_cache
+            )
         gap_payload.append(
             {
                 "id": gap.id,
                 "signal_code": signal.code if signal else "",
-                "device_code": signal.device_code if signal else "",
+                "device_code": device_code,
                 "measure_name": signal.measure_name if signal else "",
                 "start_ts": iso(gap.start_ts),
                 "end_ts": iso(gap.end_ts),

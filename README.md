@@ -66,6 +66,23 @@
      `drift_score = exp(-max|drift_ms| / 1000)`。
 - 失败态：对齐后没有任何观测 → `no_data`，不评分。
 
+### C. 测点归属切换（`backend/src/services/ownership_service.py`）
+
+检修后标签改接（如 `M-10.PRESS` 液压压力改接 `M-12`、编码沿用）在「数据源与测点」页登记，
+归属按**采集时间**生效，语义固定：
+
+- `signal_ownership` 保存半开区间 `[effective_from, effective_to)` 的归属时间线，末段开放；
+  首次登记自动把原归属封存为基线段（起点 = 该测点首个已归档样本）；
+- 切换时刻之前的样本仍归原设备，之后的新样本归新设备；**不改写** `raw_telemetry`
+  与已落库运行快照（历史数据不回填）；
+- 生效时刻不晚于首个归档样本 → 422（防止把全部历史划给新设备）；
+  落在已封存区间或既有切换点上 → 409 冲突并返回冲突区间；
+- 对齐取数按归属段拆分样本，同一测点在跨切换点的窗口内会分成两条序列
+  （同编码、不同 `device_code`）；缺口事件按发生时刻解析归属，旧运行仍按原设备回看导出。
+
+接口：`GET /signals/{id}/ownership`（时间线 + 各段影响样本数）、
+`POST /signals/{id}/reassignments`（engineer 登记，审计 `signal.reassign`）。
+
 ## 快速启动
 
 ```bash

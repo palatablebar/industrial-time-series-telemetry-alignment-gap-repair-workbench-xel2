@@ -47,13 +47,13 @@
               <div class="signal-tabs">
                 <button
                   v-for="(item, index) in run.series"
-                  :key="item.signal_code"
+                  :key="`${item.signal_code}@${item.device_code}#${index}`"
                   class="signal-tab"
                   :class="{ 'signal-tab--active': activeIndex === index }"
                   @click="activeIndex = index"
                 >
                   <span class="mono">{{ item.signal_code }}</span>
-                  <span class="signal-tab__meta">{{ item.measure_name }}</span>
+                  <span class="signal-tab__meta">{{ item.device_code }} · {{ item.measure_name }}</span>
                 </button>
               </div>
               <WaveformChart :series-list="run.series" :gaps="run.gaps" :active-index="activeIndex" :grid-s="run.grid_s" mode="wave" />

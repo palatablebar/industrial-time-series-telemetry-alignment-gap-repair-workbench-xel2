@@ -4,18 +4,27 @@ from sqlalchemy.orm import Session
 
 from src.constants.error_codes import AppError, ErrorCode
 from src.models import AlignmentRun, GapEvent
-from src.utils.timeutil import iso
+from src.services import ownership_service
+from src.utils.timeutil import iso, to_epoch
 
 
-def _to_dict(gap: GapEvent, run: AlignmentRun | None) -> dict:
+def _to_dict(db: Session, gap: GapEvent, run: AlignmentRun | None, ownership_cache: dict) -> dict:
     signal = gap.signal
+    device_code = signal.device_code if signal else ""
+    device_name = signal.device_name if signal else ""
+    if signal is not None:
+        # ownership is resolved at the gap's collection time: a tag re-wired to
+        # another device keeps its historical gaps under the original device
+        device_code, device_name = ownership_service.resolve_device(
+            db, signal, to_epoch(gap.start_ts), ownership_cache
+        )
     return {
         "id": gap.id,
         "run_id": gap.run_id,
         "run_name": run.job.name if run and run.job else "",
         "signal_code": signal.code if signal else "",
-        "device_code": signal.device_code if signal else "",
-        "device_name": signal.device_name if signal else "",
+        "device_code": device_code,
+        "device_name": device_name,
         "measure_name": signal.measure_name if signal else "",
         "unit": signal.unit if signal else "",
         "start_ts": iso(gap.start_ts),
@@ -43,7 +52,8 @@ def list_gaps(
         statement = statement.where(GapEvent.severity == severity)
     gaps = list(db.scalars(statement))
     runs = {run.id: run for run in db.scalars(select(AlignmentRun))}
-    items = [_to_dict(gap, runs.get(gap.run_id)) for gap in gaps]
+    ownership_cache: dict[int, list] = {}
+    items = [_to_dict(db, gap, runs.get(gap.run_id), ownership_cache) for gap in gaps]
     if device_code:
         items = [item for item in items if item["device_code"] == device_code]
     return items

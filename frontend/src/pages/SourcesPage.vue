@@ -66,7 +66,7 @@
         <div class="panel">
           <div class="panel__title">
             <h2>测点档案</h2>
-            <span class="mono source-count">{{ store.detail.signals.length }} signals</span>
+            <span class="mono source-count">{{ store.detail.signals.length }} signals · 点击测点查看归属</span>
           </div>
           <div class="signal-grid">
             <SignalCard
@@ -74,9 +74,18 @@
               :key="signal.id"
               :signal="signal"
               :source-code="store.detail.source.code"
+              :active="selectedSignalId === signal.id"
+              @select="selectedSignalId = signal.id"
             />
           </div>
         </div>
+
+        <OwnershipPanel
+          v-if="selectedSignal"
+          :key="selectedSignal.id"
+          :signal="selectedSignal"
+          @changed="refreshDetail"
+        />
       </section>
       <div v-else class="loading mono">读取网关档案…</div>
     </div>
@@ -85,16 +94,35 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import PageHeader from '../components/common/PageHeader.vue'
 import ErrorNotice from '../components/common/ErrorNotice.vue'
 import SignalCard from '../components/domain/SignalCard.vue'
 import DriftBadge from '../components/domain/DriftBadge.vue'
+import OwnershipPanel from '../components/domain/OwnershipPanel.vue'
 import { useSourceStore } from '../stores/sourceStore'
 import { PROTOCOL_LABELS } from '../constants/labels'
 import { formatDateTime } from '../utils/format'
 
 const store = useSourceStore()
+const selectedSignalId = ref<number | null>(null)
+
+const selectedSignal = computed(
+  () => store.detail?.signals.find((signal) => signal.id === selectedSignalId.value) ?? null,
+)
+
+async function refreshDetail() {
+  if (store.detail) {
+    await store.select(store.detail.source.id)
+  }
+}
+
+watch(
+  () => store.detail?.source.id,
+  () => {
+    selectedSignalId.value = null
+  },
+)
 
 onMounted(() => store.load())
 </script>

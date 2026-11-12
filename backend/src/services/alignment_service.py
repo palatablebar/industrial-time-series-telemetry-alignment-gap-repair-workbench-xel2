@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from src.constants.enums import FailureReason, JobStatus, RunStatus
 from src.models import AlignmentJob, AlignmentRun, GapEvent, RawTelemetry, Signal
-from src.services import gap_engine
+from src.services import gap_engine, ownership_service
 from src.services.align_engine import SignalInput, align_job
 from src.utils.logger import log_event
 from src.utils.timeutil import from_epoch, iso, to_epoch
@@ -27,19 +27,24 @@ def _load(inputs: list[Signal], db: Session, window_start: float, window_end: fl
             )
             .order_by(RawTelemetry.ts)
         ).all()
-        payloads.append(
-            SignalInput(
-                signal_id=signal.id,
-                signal_code=signal.code,
-                device_code=signal.device_code,
-                device_name=signal.device_name,
-                measure_name=signal.measure_name,
-                unit=signal.unit,
-                source_id=signal.source_id,
-                source_code=signal.source.code if signal.source else "",
-                points=[(float(row[0]), float(row[1]), int(row[2])) for row in rows],
+        points = [(float(row[0]), float(row[1]), int(row[2])) for row in rows]
+        # a tag re-wired to another device contributes one input per ownership
+        # segment, so pre-switch samples stay with the old device and post-switch
+        # samples land under the new one (ownership by collection time)
+        for device_code, device_name, owned in ownership_service.attribute_points(db, signal, points):
+            payloads.append(
+                SignalInput(
+                    signal_id=signal.id,
+                    signal_code=signal.code,
+                    device_code=device_code,
+                    device_name=device_name,
+                    measure_name=signal.measure_name,
+                    unit=signal.unit,
+                    source_id=signal.source_id,
+                    source_code=signal.source.code if signal.source else "",
+                    points=owned,
+                )
             )
-        )
     return payloads
 
 

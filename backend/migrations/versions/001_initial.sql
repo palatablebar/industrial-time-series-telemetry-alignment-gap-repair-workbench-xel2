@@ -53,6 +53,24 @@ CREATE TABLE raw_telemetry (
     CONSTRAINT uq_raw_signal_ts UNIQUE (signal_id, ts)
 );
 
+-- ownership timeline of a signal: half-open [effective_from, effective_to) segments
+-- (epoch seconds, NULL effective_to = currently open). Ownership resolves by
+-- collection time; raw rows and stored runs are never rewritten on re-wiring.
+CREATE TABLE signal_ownership (
+    id SERIAL PRIMARY KEY,
+    signal_id INTEGER NOT NULL REFERENCES signal(id),
+    device_code VARCHAR(40) NOT NULL,
+    device_name VARCHAR(80) DEFAULT '',
+    effective_from DOUBLE PRECISION NOT NULL,
+    effective_to DOUBLE PRECISION,
+    kind VARCHAR(16) DEFAULT 'reassignment',
+    note VARCHAR(200) DEFAULT '',
+    created_by INTEGER REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT now()
+);
+CREATE INDEX ix_signal_ownership_signal ON signal_ownership (signal_id);
+CREATE INDEX ix_signal_ownership_device ON signal_ownership (device_code);
+
 CREATE TABLE alignment_job (
     id SERIAL PRIMARY KEY,
     name VARCHAR(140) UNIQUE NOT NULL,

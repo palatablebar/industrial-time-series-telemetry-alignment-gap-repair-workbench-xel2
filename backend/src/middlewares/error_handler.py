@@ -38,7 +38,7 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=422,
             content=error_envelope(
-                ErrorCode.VALIDATION_FAILED.value,
+                ErrorCode.VALIDATION_FAILED,
                 "请求参数校验未通过",
                 _request_id(request),
                 {"errors": [str(item.get("msg")) for item in exc.errors()][:10]},
@@ -51,6 +51,6 @@ def install_error_handlers(app: FastAPI) -> None:
         log_event("REQUEST_FAILED", path=str(request.url.path), error=f"{type(exc).__name__}: {exc}")
         return JSONResponse(
             status_code=500,
-            content=error_envelope(ErrorCode.INTERNAL.value, "服务内部错误", _request_id(request)),
+            content=error_envelope(ErrorCode.INTERNAL, "服务内部错误", _request_id(request)),
             headers={"X-Request-ID": _request_id(request) or ""},
         )

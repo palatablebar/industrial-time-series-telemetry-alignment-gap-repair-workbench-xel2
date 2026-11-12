@@ -6,6 +6,7 @@ from src.controllers import source_controller
 from src.middlewares.auth import get_current_user
 from src.middlewares.rbac import WRITE_ROLES, require_roles
 from src.models import User
+from src.schemas.ownership import OwnershipReassign
 from src.schemas.source import SignalCreate
 
 router = APIRouter(prefix="/signals", tags=["signals"])
@@ -28,3 +29,23 @@ def create_signal(
     _user: User = Depends(require_roles(*WRITE_ROLES)),
 ) -> dict:
     return source_controller.create_signal(request, db, payload)
+
+
+@router.get("/{signal_id}/ownership")
+def signal_ownership(
+    signal_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
+    return source_controller.signal_ownership(db, signal_id)
+
+
+@router.post("/{signal_id}/reassignments")
+def reassign_signal(
+    signal_id: int,
+    payload: OwnershipReassign,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(*WRITE_ROLES)),
+) -> dict:
+    return source_controller.reassign_signal(request, db, signal_id, payload, user)

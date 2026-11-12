@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from src.middlewares.audit_logger import record
-from src.services import signal_service, source_service
+from src.services import ownership_service, signal_service, source_service
 
 
 def list_sources(db: Session) -> dict:
@@ -42,3 +42,30 @@ def create_signal(request, db: Session, payload) -> dict:
     signal = signal_service.create_signal(db, payload)
     record(request, "signal.create", "signal", signal.id, after={"code": signal.code})
     return {"signal": source_service.signal_to_dict(signal)}
+
+
+def signal_ownership(db: Session, signal_id: int) -> dict:
+    signal = signal_service.get_signal(db, signal_id)
+    timeline = ownership_service.timeline(db, signal)
+    return {"signal": source_service.signal_to_dict(signal), **timeline}
+
+
+def reassign_signal(request, db: Session, signal_id: int, payload, user) -> dict:
+    signal = signal_service.get_signal(db, signal_id)
+    before = {"device_code": signal.device_code, "device_name": signal.device_name}
+    result = ownership_service.register_reassignment(db, signal, payload, user)
+    record(
+        request,
+        "signal.reassign",
+        "signal",
+        signal.id,
+        before=before,
+        after={
+            "device_code": signal.device_code,
+            "device_name": signal.device_name,
+            "effective_from": payload.effective_from,
+            "affected_samples": result["affected_samples"],
+        },
+    )
+    result["signal"] = source_service.signal_to_dict(signal)
+    return result
